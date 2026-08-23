@@ -1,0 +1,7 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getCurrentUser } from "../lib/auth";
+const user = await getCurrentUser(Astro);
+if (user) return Astro.redirect("/dashboard");
+---
+<BaseLayout title="Login — BoyKingTut.com"><main class="detail-page"><section class="detail-hero"><img src="/images/hero-eternal-spark.jpg"/><div class="detail-hero-copy"><p class="card-kicker">ACCOUNT</p><h1>Google Login</h1><p>Choose how you are joining the system.</p></div></section><section class="page-section"><div class="info-grid"><article class="info-card"><h3>Customer</h3><p>Buy subscriptions, verify Solana payments and monitor access.</p><a class="gold-cta" href="/auth/google?role=customer">CONTINUE WITH GOOGLE</a></article><article class="info-card"><h3>Affiliate / Make Money</h3><p>Get your affiliate code, monitor clients, notes and commission ledger.</p><a class="gold-cta" href="/auth/google?role=affiliate">JOIN WITH GOOGLE</a></article><article class="info-card"><h3>Owner / Admin</h3><p>Owner access is automatically recognized from the ADMIN_EMAILS secret.</p></article></div></section></main></BaseLayout>

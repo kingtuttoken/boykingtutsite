@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getCurrentUser } from "../lib/auth";
+import { createQuote } from "../lib/payments";
+import { getProduct } from "../lib/products";
+const user = await getCurrentUser(Astro);
+if (!user) return Astro.redirect(`/login?next=${encodeURIComponent(Astro.url.pathname+Astro.url.search)}`);
+const productId = Astro.url.searchParams.get("product") || "crypto_basic";
+const product = getProduct(productId);
+if (!product) return new Response("Unknown product", {status:404});
+let quote:any=null,error="";
+try { quote = await createQuote(user.id, productId); } catch(e:any) { error=e.message; }
+---
+<BaseLayout title="Solana Checkout — BoyKingTut.com"><main class="detail-page"><section class="detail-hero"><img src="/images/hero-eternal-spark.jpg"/><div class="detail-hero-copy"><p class="card-kicker">SOLANA CHECKOUT</p><h1>{product.name}</h1><p>Live SOL/USD quote. Quote expires five minutes after creation.</p></div></section>
+{error ? <section class="page-section"><div class="notice-box">{error}</div></section> : <section class="page-section"><div class="info-grid"><article class="info-card"><h3>USD Price</h3><p>${quote.usd.toFixed(2)}</p></article><article class="info-card"><h3>Live SOL/USD</h3><p>${quote.solUsd.toFixed(2)}</p></article><article class="info-card"><h3>Send Exactly</h3><p><strong>{quote.solAmount.toFixed(9)} SOL</strong></p></article></div>
+<div class="form-card"><h3>Payment Instructions</h3><p>1. Send <b>{quote.solAmount.toFixed(9)} SOL</b> to:</p><p class="mono">{quote.wallet}</p><p>2. Complete the transaction before the timer expires.</p><p>3. Paste the Solana transaction signature below. The server verifies the finalized blockchain transaction and amount.</p><p id="timer" class="status-warn"></p>
+<form id="verifyForm"><input type="hidden" name="quote_id" value={quote.id}/><label>Transaction Signature</label><input name="signature" required minlength="40" autocomplete="off"/><button class="gold-cta" type="submit">VERIFY BLOCKCHAIN PAYMENT</button></form><p id="result"></p></div></section>}
+<script define:vars={{expiresAt: quote?.expiresAt || 0}} is:inline>
+const t=document.getElementById("timer");
+function tick(){const n=Math.max(0,expiresAt-Date.now()),m=Math.floor(n/60000),s=Math.floor((n%60000)/1000);if(t)t.textContent=`Quote expires in ${m}:${String(s).padStart(2,"0")}`;}
+tick();setInterval(tick,1000);
+document.getElementById("verifyForm")?.addEventListener("submit",async ev=>{ev.preventDefault();const f=new FormData(ev.target),r=document.getElementById("result");r.textContent="Checking Solana blockchain...";const res=await fetch("/api/payment/verify",{method:"POST",body:f});const j=await res.json();r.textContent=j.ok?"Payment verified. Opening dashboard...":j.error;if(j.ok)setTimeout(()=>location.href="/dashboard?paid=1",900);});
+</script>
+</main></BaseLayout>

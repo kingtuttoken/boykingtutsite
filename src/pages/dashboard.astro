@@ -1,0 +1,36 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getCurrentUser } from "../lib/auth";
+import { requireDB, cfg } from "../lib/config";
+import { PRODUCTS } from "../lib/products";
+const user = await getCurrentUser(Astro);
+if (!user) return Astro.redirect("/login");
+const db = requireDB();
+const payments:any = await db.prepare("SELECT * FROM payments WHERE user_id=? ORDER BY verified_at DESC LIMIT 20").bind(user.id).all();
+const subs:any = await db.prepare("SELECT * FROM subscriptions WHERE user_id=? ORDER BY expires_at DESC").bind(user.id).all();
+const orders:any = await db.prepare("SELECT * FROM orders WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
+let clients:any={results:[]}, commissions:any={results:[]}, notes:any={results:[]};
+if (["affiliate","owner","admin"].includes(user.role)) {
+  clients = await db.prepare(`SELECT u.id,u.name,u.email,u.created_at,
+    (SELECT MAX(expires_at) FROM subscriptions s WHERE s.user_id=u.id AND s.status='active') active_until
+    FROM users u WHERE u.referred_by=? ORDER BY u.created_at DESC`).bind(user.id).all();
+  commissions = await db.prepare("SELECT * FROM commissions WHERE affiliate_user_id=? ORDER BY created_at DESC").bind(user.id).all();
+  notes = await db.prepare("SELECT client_user_id,note,updated_at FROM affiliate_notes WHERE affiliate_user_id=?").bind(user.id).all();
+}
+const noteMap = Object.fromEntries((notes.results||[]).map((n:any)=>[n.client_user_id,n.note]));
+const owed = (commissions.results||[]).filter((c:any)=>c.status==="owed").reduce((a:number,c:any)=>a+Number(c.sol_amount),0);
+const referralUrl = user.affiliate_code ? `${cfg().SITE_URL}/r/${user.affiliate_code}` : "";
+---
+<BaseLayout title="Dashboard — BoyKingTut.com"><main class="dashboard-page">
+<section class="account-head"><div><p class="card-kicker">ACCOUNT DASHBOARD</p><h1>{user.name || user.email}</h1><p class="muted">{user.email} · {user.role.toUpperCase()}</p></div>{user.picture && <img class="avatar" src={user.picture} alt="Profile"/>}<a class="dark-cta" href="/auth/logout">LOG OUT</a></section>
+<div class="dashboard-grid"><article class="dash-card"><h3>Role</h3><p>{user.role}</p></article><article class="dash-card"><h3>Subscriptions</h3><p>{subs.results?.length || 0}</p></article><article class="dash-card"><h3>Payments</h3><p>{payments.results?.length || 0}</p></article>{user.affiliate_code && <article class="dash-card"><h3>Commission Owed</h3><p>{owed.toFixed(6)} SOL</p></article>}</div>
+
+<section class="page-section"><h2>Buy / Renew</h2><div class="pricing-grid"><article class="price-card"><strong>$50</strong><b>Crypto Basic</b><a class="gold-cta" href="/checkout?product=crypto_basic">PAY WITH SOL</a></article><article class="price-card"><strong>$150</strong><b>Crypto Pro</b><a class="gold-cta" href="/checkout?product=crypto_pro">PAY WITH SOL</a></article><article class="price-card"><strong>$300</strong><b>Solo Machine</b><a class="gold-cta" href="/checkout?product=solo_machine">ORDER</a></article><article class="price-card"><strong>$399</strong><b>Local Plus</b><a class="gold-cta" href="/checkout?product=local_plus">PAY WITH SOL</a></article></div></section>
+
+<section class="page-section"><h2>Your Subscriptions</h2><div class="table-wrap"><table><thead><tr><th>Plan</th><th>Status</th><th>Expires</th></tr></thead><tbody>{(subs.results||[]).map((s:any)=><tr><td>{PRODUCTS[s.product_id]?.name || s.product_id}</td><td>{s.status}</td><td>{new Date(s.expires_at).toLocaleString()}</td></tr>)}</tbody></table></div></section>
+<section class="page-section"><h2>Payments</h2><div class="table-wrap"><table><thead><tr><th>Product</th><th>USD</th><th>SOL</th><th>Verified</th></tr></thead><tbody>{(payments.results||[]).map((p:any)=><tr><td>{PRODUCTS[p.product_id]?.name || p.product_id}</td><td>${Number(p.usd_amount).toFixed(2)}</td><td>{Number(p.sol_amount).toFixed(9)}</td><td>{new Date(p.verified_at).toLocaleString()}</td></tr>)}</tbody></table></div></section>
+
+{user.affiliate_code && <section class="page-section"><h2>Affiliate Dashboard</h2><div class="info-grid"><article class="info-card"><h3>Your Code</h3><p class="mono">{user.affiliate_code}</p></article><article class="info-card"><h3>Your Referral Link</h3><p class="mono">{referralUrl}</p></article><article class="info-card"><h3>Active Clients</h3><p>{(clients.results||[]).filter((c:any)=>Number(c.active_until)>Date.now()).length}</p></article></div><div class="table-wrap"><table><thead><tr><th>Client</th><th>Email</th><th>Subscription</th><th>Notes</th></tr></thead><tbody>{(clients.results||[]).map((c:any)=><tr><td>{c.name||"—"}</td><td>{c.email}</td><td>{c.active_until && Number(c.active_until)>Date.now() ? "ACTIVE" : "INACTIVE"}</td><td><form method="post" action="/api/affiliate/note"><input type="hidden" name="client_id" value={c.id}/><textarea name="note" rows="2">{noteMap[c.id]||""}</textarea><button class="dark-cta">SAVE NOTE</button></form></td></tr>)}</tbody></table></div><h3>Commission Ledger</h3><div class="table-wrap"><table><thead><tr><th>USD</th><th>SOL</th><th>Status</th><th>Date</th></tr></thead><tbody>{(commissions.results||[]).map((c:any)=><tr><td>${Number(c.usd_amount).toFixed(2)}</td><td>{Number(c.sol_amount).toFixed(9)}</td><td>{c.status}</td><td>{new Date(c.created_at).toLocaleString()}</td></tr>)}</tbody></table></div></section>}
+
+{["owner","admin"].includes(user.role) && <section class="page-section"><a class="gold-cta" href="/admin">OPEN OWNER / ADMIN</a></section>}
+</main></BaseLayout>

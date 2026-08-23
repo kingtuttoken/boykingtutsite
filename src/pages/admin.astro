@@ -1,0 +1,22 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getCurrentUser } from "../lib/auth";
+import { requireDB } from "../lib/config";
+import { PRODUCTS } from "../lib/products";
+const user=await getCurrentUser(Astro); if(!user) return Astro.redirect("/login"); if(!["owner","admin"].includes(user.role)) return Astro.redirect("/dashboard");
+const db=requireDB();
+const users:any=await db.prepare("SELECT id,name,email,role,affiliate_code,created_at,last_login_at FROM users ORDER BY created_at DESC LIMIT 100").all();
+const pays:any=await db.prepare("SELECT p.*,u.email FROM payments p JOIN users u ON u.id=p.user_id ORDER BY verified_at DESC LIMIT 100").all();
+const comm:any=await db.prepare("SELECT c.*,a.email affiliate_email,u.email client_email FROM commissions c JOIN users a ON a.id=c.affiliate_user_id JOIN users u ON u.id=c.client_user_id ORDER BY created_at DESC LIMIT 100").all();
+const stats:any=await db.prepare(`SELECT
+(SELECT COUNT(*) FROM users) users,
+(SELECT COUNT(*) FROM users WHERE role='affiliate') affiliates,
+(SELECT COUNT(*) FROM payments) payments,
+(SELECT COUNT(*) FROM subscriptions WHERE status='active' AND expires_at > ?) active_subs`).bind(Date.now()).first();
+---
+<BaseLayout title="Admin — BoyKingTut.com"><main class="dashboard-page"><section class="account-head"><div><p class="card-kicker">OWNER / ADMIN</p><h1>System Control</h1><p class="muted">{user.email}</p></div><a class="dark-cta" href="/dashboard">BACK TO DASHBOARD</a></section>
+<div class="dashboard-grid"><article class="dash-card"><h3>Users</h3><p>{stats.users}</p></article><article class="dash-card"><h3>Affiliates</h3><p>{stats.affiliates}</p></article><article class="dash-card"><h3>Payments</h3><p>{stats.payments}</p></article><article class="dash-card"><h3>Active Subs</h3><p>{stats.active_subs}</p></article></div>
+<section class="page-section"><h2>Recent Users</h2><div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Affiliate Code</th></tr></thead><tbody>{(users.results||[]).map((u:any)=><tr><td>{u.id}</td><td>{u.name}</td><td>{u.email}</td><td>{u.role}</td><td>{u.affiliate_code||"—"}</td></tr>)}</tbody></table></div></section>
+<section class="page-section"><h2>Verified Payments</h2><div class="table-wrap"><table><thead><tr><th>User</th><th>Product</th><th>USD</th><th>SOL</th><th>Signature</th></tr></thead><tbody>{(pays.results||[]).map((p:any)=><tr><td>{p.email}</td><td>{PRODUCTS[p.product_id]?.name||p.product_id}</td><td>${Number(p.usd_amount).toFixed(2)}</td><td>{Number(p.sol_amount).toFixed(9)}</td><td class="mono">{p.signature}</td></tr>)}</tbody></table></div></section>
+<section class="page-section"><h2>Affiliate Commission Ledger</h2><div class="table-wrap"><table><thead><tr><th>Affiliate</th><th>Client</th><th>USD</th><th>SOL</th><th>Status</th><th>Record Payout</th></tr></thead><tbody>{(comm.results||[]).map((c:any)=><tr><td>{c.affiliate_email}</td><td>{c.client_email}</td><td>${Number(c.usd_amount).toFixed(2)}</td><td>{Number(c.sol_amount).toFixed(9)}</td><td>{c.status}</td><td>{c.status==="owed" ? <form method="post" action="/api/admin/commission-paid"><input type="hidden" name="commission_id" value={c.id}/><input name="signature" placeholder="Payout transaction signature" required/><button class="dark-cta">MARK PAID</button></form> : <span class="mono">{c.payout_signature}</span>}</td></tr>)}</tbody></table></div><div class="notice-box">Affiliate payouts are intentionally recorded after you send SOL from your own secure wallet. Do not store an offline-wallet private key or seed phrase in this website or GitHub repository.</div></section>
+</main></BaseLayout>
