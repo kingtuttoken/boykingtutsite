@@ -1,18 +1,24 @@
----
-import { getCurrentUser } from "../lib/auth";
-const user = await getCurrentUser(Astro);
----
 <header class="topbar">
-  <a class="brand" href="/"><span class="brand-icon">𓂀</span><span class="brand-copy"><b>BOY KING TUT</b><small>ETERNAL SPARK</small></span></a>
+  <a class="brand" href="/">
+    <span class="brand-icon">𓂀</span>
+    <span class="brand-copy"><b>BOY KING TUT</b><small>ETERNAL SPARK</small></span>
+  </a>
   <button id="menuBtn" class="menu-btn" aria-label="Open navigation" aria-expanded="false">☰</button>
   <nav id="mainNav" class="main-nav">
-    <a href="/crypto">Crypto</a><a href="/advertising">Advertising</a><a href="/affiliate">Affiliates</a>
-    <a href="/metaverse">Metaverse</a><a href="/egypt">Egypt</a><a href="/book">Book</a><a href="/knowledge">Knowledge</a>
-    <a href="/#faq">FAQ</a><a href="/#pricing">Pricing</a>
+    <a href="/crypto">Crypto</a>
+    <a href="/advertising">Advertising</a>
+    <a href="/affiliate">Affiliates</a>
+    <a href="/metaverse">Metaverse</a>
+    <a href="/egypt">Egypt</a>
+    <a href="/book">Book</a>
+    <a href="/knowledge">Knowledge</a>
+    <a href="/payments">Payments</a>
+    <a href="/#faq">FAQ</a>
+    <a href="/#pricing">Pricing</a>
   </nav>
   <div class="top-actions">
     <a class="dark-cta" href="https://discord.gg/HA73BUfJ67" target="_blank" rel="noopener noreferrer">JOIN DISCORD</a>
-    <a class="account-button" href={user ? "/dashboard" : "/login"}>{user ? "DASHBOARD" : "ACCOUNT"}</a>
+    <a class="account-button" href="/affiliate">MAKE MONEY</a>
   </div>
 </header>
 <script is:inline>
